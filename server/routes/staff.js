@@ -458,3 +458,305 @@ router.get('/stats/overview', authorize('admin', 'manager'), async (req, res) =>
 });
 
 module.exports = router;
+
+// Additional Staff & Operations endpoints
+
+// @route   GET /api/staff/attendance
+// @desc    Get staff attendance / check-ins (best-effort: uses `checkins` field on User if present)
+// @access  Private (Admin/Manager)
+router.get('/attendance', authorize('admin', 'manager'), async (req, res) => {
+  try {
+    // support filtering by date (ISO)
+    const date = req.query.date ? new Date(req.query.date) : new Date();
+    const start = new Date(date);
+    start.setHours(0,0,0,0);
+    const end = new Date(date);
+    end.setHours(23,59,59,999);
+
+    // If User has `checkins` array with timestamps, aggregate them; otherwise return empty.
+    const staffWithCheckins = await User.find({ role: 'staff' }).select('name role checkins isActive');
+
+    const attendance = (staffWithCheckins || []).map(u => {
+      const todays = (u.checkins || []).filter(ts => {
+        const d = new Date(ts);
+        return d >= start && d <= end;
+      });
+      return {
+        id: u._id,
+        name: u.name,
+        isActive: u.isActive,
+        checkins: todays,
+        checkedIn: (todays.length > 0)
+      };
+    });
+
+    res.json({ date: start.toISOString().slice(0,10), attendance });
+  } catch (error) {
+    console.error('Get staff attendance error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/staff/performance/top
+// @desc    Get waiter/chef performance stats (orders served, avg speed)
+// @access  Private (Admin/Manager)
+router.get('/performance/top', authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const perf = await Order.aggregate([
+      { $match: { createdAt: { $gte: since }, status: 'completed', staff: { $exists: true, $ne: null } } },
+      { $group: { _id: '$staff', ordersServed: { $sum: 1 }, avgCompletion: { $avg: '$actualTime' }, totalRevenue: { $sum: '$total' } } },
+      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'staff' } },
+      { $unwind: '$staff' },
+      { $project: { staffId: '$_id', name: '$staff.name', role: '$staff.role', ordersServed: 1, avgCompletion: 1, totalRevenue: 1 } },
+      { $sort: { ordersServed: -1 } },
+      { $limit: 10 }
+    ]);
+
+    res.json(perf);
+  } catch (error) {
+    console.error('Get top performance error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/staff/pending-tasks
+// @desc    Get pending tasks (kitchen prep, stock updates) - best-effort using Orders and Inventory
+// @access  Private (Admin/Manager)
+router.get('/pending-tasks', authorize('admin', 'manager'), async (req, res) => {
+  try {
+    // Pending kitchen tasks: orders with status 'pending' or 'preparing'
+    const kitchen = await Order.find({ status: { $in: ['pending', 'preparing'] } })
+      .select('orderNumber items status placedAt table assignedTo')
+      .limit(100)
+      .lean();
+
+    // Low stock items as tasks
+    const lowStock = await require('./../models/InventoryItem').find({ quantity: { $lte: 5 } }).select('name quantity');
+
+    res.json({ kitchenTasks: kitchen, lowStockTasks: lowStock });
+  } catch (error) {
+    console.error('Get pending tasks error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/staff/shift-overview
+// @desc    Get current shift overview (who's on shift, shift times) - best-effort
+// @access  Private (Admin/Manager)
+router.get('/shift-overview', authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const now = new Date();
+
+    // Support a common schedule field on User: shifts: [{ start, end, role }]
+    const staff = await User.find({ role: 'staff' }).select('name shifts isActive role');
+
+    const onShift = [];
+    (staff || []).forEach(u => {
+      const shifts = u.shifts || [];
+      for (const s of shifts) {
+        try {
+          const start = new Date(s.start);
+          const end = new Date(s.end);
+          if (start <= now && end >= now) {
+            onShift.push({ id: u._id, name: u.name, role: u.role, shift: s });
+            break;
+          }
+        } catch (e) {
+          // ignore malformed shift
+        }
+      }
+    });
+
+    res.json({ now: now.toISOString(), onShift });
+  } catch (error) {
+    console.error('Get shift overview error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Staff-facing endpoints
+// @route GET /api/staff/assigned-orders
+// @desc Orders assigned to the current staff member (or by staffId for managers/admins)
+// @access Private (staff, manager, admin)
+router.get('/assigned-orders', authorize('staff', 'manager', 'admin'), async (req, res) => {
+  try {
+    const staffId = (req.user && req.user._id) || req.query.staffId;
+    if (!staffId) return res.status(400).json({ message: 'No staff id available' });
+
+    const q = { $or: [ { assignedTo: staffId }, { staff: staffId } ] };
+    // optional filters: status
+    if (req.query.status) q.status = req.query.status;
+
+    const orders = await Order.find(q).select('orderNumber items status placedAt table deliveryDetails specialInstructions priority customer assignedTo').sort({ createdAt: -1 }).limit(200).lean();
+    res.json({ orders });
+  } catch (err) {
+    console.error('assigned orders error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route PATCH /api/staff/assigned-orders/:id/status
+// @desc Update order status by staff (must be assigned or manager/admin)
+// @access Private (staff, manager, admin)
+router.patch('/assigned-orders/:id/status', authorize('staff', 'manager', 'admin'), async (req, res) => {
+  try {
+    const { status } = req.body;
+    const allowed = ['pending', 'preparing', 'in-progress', 'ready', 'completed', 'cancelled'];
+    if (!allowed.includes(status)) return res.status(400).json({ message: 'Invalid status' });
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    // staff can only update if assigned
+    if (req.user.role === 'staff' && String(order.assignedTo) !== String(req.user._id) && String(order.staff) !== String(req.user._id)) {
+      return res.status(403).json({ message: 'Not authorized to update this order' });
+    }
+
+    order.status = status;
+    if (status === 'completed') order.completedAt = new Date();
+    await order.save();
+
+    res.json({ message: 'Order status updated', order });
+  } catch (err) {
+    console.error('update assigned order status error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route GET /api/staff/inventory-tasks
+// @desc Inventory tasks visible to staff (low stock, prep tasks)
+// @access Private (staff, manager, admin)
+router.get('/inventory-tasks', authorize('staff', 'manager', 'admin'), async (req, res) => {
+  try {
+    const InventoryItem = require('../models/InventoryItem');
+    const low = await InventoryItem.find({ quantity: { $lte: 5 } }).select('name quantity unit lowStockThreshold').limit(100).lean();
+
+    // Prep tasks from a `PrepTask` model if present
+    let prepTasks = [];
+    try {
+      const PrepTask = require('../models/PrepTask');
+      prepTasks = await PrepTask.find({ completed: { $ne: true } }).limit(100).lean();
+    } catch (e) {
+      prepTasks = [];
+    }
+
+    res.json({ lowStock: low, prepTasks });
+  } catch (err) {
+    console.error('inventory tasks error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route GET /api/staff/messages
+// @desc Retrieve staff messages / announcements (best-effort; requires Message model)
+// @access Private (staff, manager, admin)
+router.get('/messages', authorize('staff', 'manager', 'admin'), async (req, res) => {
+  try {
+    try {
+      const Message = require('../models/Message');
+      const msgs = await Message.find({ $or: [{ to: null }, { to: req.user._id }] }).sort({ createdAt: -1 }).limit(200).lean();
+      return res.json({ messages: msgs });
+    } catch (e) {
+      // fallback: return some static announcements
+      const announcements = [
+        { id: 'a1', text: 'Team meeting at 6 PM in the back room', createdAt: new Date(), from: 'manager' },
+        { id: 'a2', text: 'VIP guest at table 5', createdAt: new Date(), from: 'manager' }
+      ];
+      return res.json({ messages: announcements });
+    }
+  } catch (err) {
+    console.error('messages error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route POST /api/staff/messages
+// @desc Post a message/announcement (staff -> manager or manager -> staff). Best-effort.
+// @access Private (staff, manager, admin)
+router.post('/messages', authorize('staff', 'manager', 'admin'), async (req, res) => {
+  try {
+    const { to, text } = req.body;
+    if (!text) return res.status(400).json({ message: 'Text is required' });
+    try {
+      const Message = require('../models/Message');
+      const m = new Message({ from: req.user._id, to: to || null, text });
+      await m.save();
+      return res.status(201).json({ message: 'Message sent', m });
+    } catch (e) {
+      // fallback: echo back
+      return res.status(201).json({ message: 'Message received (no persistence available)', messageObj: { from: req.user.name, to: to || null, text, createdAt: new Date() } });
+    }
+  } catch (err) {
+    console.error('post message error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route GET /api/staff/reservations
+// @desc Get upcoming reservations relevant to staff (hosts/servers)
+// @access Private (staff, manager, admin)
+router.get('/reservations', authorize('staff', 'manager', 'admin'), async (req, res) => {
+  try {
+    try {
+      const Reservation = require('../models/Reservation');
+      const since = new Date();
+      const until = new Date(Date.now() + 48 * 60 * 60 * 1000);
+      const q = { date: { $gte: since, $lte: until } };
+      // allow filtering by staff assignment
+      if (req.query.staffId) q.assignedTo = req.query.staffId;
+      const reservations = await Reservation.find(q).sort({ date: 1 }).limit(200).lean();
+      return res.json({ reservations });
+    } catch (e) {
+      return res.json({ reservations: [] });
+    }
+  } catch (err) {
+    console.error('reservations for staff error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route GET /api/staff/training
+// @desc Training modules / checklists for staff. Best-effort.
+// @access Private (staff, manager, admin)
+router.get('/training', authorize('staff', 'manager', 'admin'), async (req, res) => {
+  try {
+    try {
+      const Training = require('../models/Training');
+      const modules = await Training.find({ active: true }).limit(200).lean();
+      return res.json({ modules });
+    } catch (e) {
+      const modules = [
+        { id: 't1', title: 'Opening Checklist', type: 'checklist', items: ['Count cash', 'Prepare station', 'Stock condiments'] },
+        { id: 't2', title: 'Food Safety (short)', type: 'video', url: 'https://example.com/food-safety' }
+      ];
+      return res.json({ modules });
+    }
+  } catch (err) {
+    console.error('training error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route POST /api/staff/availability
+// @desc Staff post availability or shift swap request (best-effort persistence)
+// @access Private (staff)
+router.post('/availability', authorize('staff'), async (req, res) => {
+  try {
+    const { dateFrom, dateTo, note } = req.body;
+    if (!dateFrom || !dateTo) return res.status(400).json({ message: 'dateFrom and dateTo required' });
+    try {
+      const Availability = require('../models/Availability');
+      const a = new Availability({ staff: req.user._id, dateFrom, dateTo, note });
+      await a.save();
+      return res.status(201).json({ message: 'Availability saved', a });
+    } catch (e) {
+      return res.status(201).json({ message: 'Availability received (no persistence available)', availability: { staff: req.user._id, dateFrom, dateTo, note } });
+    }
+  } catch (err) {
+    console.error('availability error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});

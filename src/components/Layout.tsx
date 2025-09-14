@@ -22,18 +22,47 @@ import {
 interface LayoutProps {
   children: React.ReactNode;
 }
-
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: Home, roles: ['admin', 'manager', 'staff'] },
-  { name: 'Customers', href: '/customers', icon: Users, roles: ['admin', 'manager', 'staff'] },
-  { name: 'Reservations', href: '/reservations', icon: Calendar, roles: ['admin', 'manager', 'staff'] },
-  { name: 'Orders', href: '/orders', icon: ShoppingBag, roles: ['admin', 'manager', 'staff'] },
-  { name: 'Menu', href: '/menu', icon: MenuIcon, roles: ['admin', 'manager'] },
-  { name: 'Inventory', href: '/inventory', icon: Box, roles: ['admin', 'manager', 'staff'] },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['admin', 'manager'] },
-  { name: 'Staff', href: '/staff', icon: UserCheck, roles: ['admin'] },
-  { name: 'Settings', href: '/settings', icon: Settings, roles: ['admin', 'manager', 'staff'] },
-];
+const ROLE_NAV: Record<string, Array<{ name: string; href: string; icon: any }>> = {
+  admin: [
+    { name: 'Dashboard', href: '/', icon: Home },
+    { name: 'Customers', href: '/customers', icon: Users },
+    { name: 'Reservations', href: '/reservations', icon: Calendar },
+    { name: 'Orders', href: '/orders', icon: ShoppingBag },
+    { name: 'Menu', href: '/menu', icon: MenuIcon },
+    { name: 'Inventory', href: '/inventory', icon: Box },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Reports', href: '/reports', icon: BarChart3 },
+    { name: 'Owner', href: '/owner', icon: BarChart3 },
+    { name: 'Staff', href: '/staff', icon: UserCheck },
+    { name: 'Settings', href: '/settings', icon: Settings }
+  ],
+  owner: [
+    { name: 'Dashboard', href: '/', icon: Home },
+    { name: 'Owner', href: '/owner', icon: BarChart3 },
+    { name: 'Reports', href: '/reports', icon: BarChart3 },
+    { name: 'Customers', href: '/customers', icon: Users },
+    { name: 'Settings', href: '/settings', icon: Settings }
+  ],
+  manager: [
+    { name: 'Dashboard', href: '/', icon: Home },
+    { name: 'Orders', href: '/orders', icon: ShoppingBag },
+    { name: 'Reservations', href: '/reservations', icon: Calendar },
+    { name: 'Inventory', href: '/inventory', icon: Box },
+    { name: 'Menu', href: '/menu', icon: MenuIcon },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Reports', href: '/reports', icon: BarChart3 },
+    { name: 'Staff', href: '/staff', icon: UserCheck },
+    { name: 'Settings', href: '/settings', icon: Settings }
+  ],
+  staff: [
+    { name: 'My Shift', href: '/staff/dashboard', icon: UserCheck },
+    { name: 'Orders', href: '/orders', icon: ShoppingBag },
+    { name: 'Reservations', href: '/reservations', icon: Calendar },
+    { name: 'Inventory', href: '/inventory', icon: Box },
+    { name: 'Menu', href: '/menu', icon: MenuIcon },
+    { name: 'Settings', href: '/settings', icon: Settings }
+  ]
+};
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { profile, signOut } = useAuth();
@@ -56,9 +85,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     localStorage.setItem('darkMode', darkMode ? 'true' : 'false');
   }, [darkMode]);
 
-  const filteredNavigation = navigation.filter(item => 
-    item.roles.includes(profile?.role || '')
-  );
+  const roleKey = (profile?.role || 'staff').toLowerCase();
+  const filteredNavigation = ROLE_NAV[roleKey] || ROLE_NAV.staff;
 
   return (
     <div className={`${darkMode ? 'dark' : ''}`}>

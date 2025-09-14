@@ -301,4 +301,110 @@ router.get('/stats/categories', async (req, res) => {
   }
 });
 
+// @route   GET /api/menu/active
+// @desc    Get active (available) menu items
+// @access  Private
+router.get('/active', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const items = await MenuItem.find({ isAvailable: true })
+      .sort({ timesOrdered: -1 })
+      .limit(limit)
+      .select('name category price timesOrdered rating isAvailable');
+
+    res.json(items);
+  } catch (error) {
+    console.error('Get active menu items error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/menu/out-of-stock
+// @desc    Get menu items that are marked unavailable or have zero stock (best-effort)
+// @access  Private
+router.get('/out-of-stock', async (req, res) => {
+  try {
+    // Some projects track inventory on MenuItem as `stock` or `inventoryCount`.
+    // Fallback to isAvailable === false when explicit stock not present.
+    const limit = parseInt(req.query.limit) || 50;
+
+    const itemsWithStock = await MenuItem.find({ $or: [{ stock: { $exists: true } }, { inventoryCount: { $exists: true } }] })
+      .lean();
+
+    const outOfStock = itemsWithStock.filter(it => {
+      const s = it.stock ?? it.inventoryCount;
+      return typeof s === 'number' ? s <= 0 : false;
+    });
+
+    // Also include items explicitly marked unavailable
+    const explicitlyUnavailable = await MenuItem.find({ isAvailable: false })
+      .select('name category price isAvailable');
+
+    // Merge unique by _id
+    const map = new Map();
+    outOfStock.forEach(i => map.set(String(i._id), i));
+    explicitlyUnavailable.forEach(i => map.set(String(i._id), i));
+
+    const results = Array.from(map.values()).slice(0, limit);
+
+    res.json(results);
+  } catch (error) {
+    console.error('Get out-of-stock items error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/menu/specials
+// @desc    Get seasonal or featured specials
+// @access  Private
+router.get('/specials', async (req, res) => {
+  try {
+    const now = new Date();
+    // Assume `specials` may be a boolean flag or `specialStart`/`specialEnd` range on MenuItem
+    const items = await MenuItem.find({
+      $or: [
+        { isSpecial: true },
+        { specials: true },
+        { $and: [{ specialStart: { $exists: true } }, { specialEnd: { $exists: true } }, { specialStart: { $lte: now } }, { specialEnd: { $gte: now } }] }
+      ]
+    }).select('name category price isSpecial specials specialStart specialEnd');
+
+    res.json(items);
+  } catch (error) {
+    console.error('Get specials error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/menu/performance
+// @desc    Get menu performance metrics (popularity, simple profitability)
+// @access  Private
+router.get('/performance', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Popularity: timesOrdered desc
+    const popular = await MenuItem.find()
+      .sort({ timesOrdered: -1 })
+      .limit(limit)
+      .select('name category price timesOrdered rating cost');
+
+    // Profitability: price - cost (if cost exists)
+    const profitability = popular.map(p => ({
+      _id: p._id,
+      name: p.name,
+      category: p.category,
+      price: p.price ?? 0,
+      cost: p.cost ?? null,
+      margin: typeof p.price === 'number' && typeof p.cost === 'number' ? (p.price - p.cost) : null,
+      timesOrdered: p.timesOrdered ?? 0
+    }));
+
+    res.json({ popular: profitability });
+  } catch (error) {
+    console.error('Get menu performance error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

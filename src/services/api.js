@@ -217,6 +217,27 @@ class ApiService {
     return this.request('/menu/stats/categories');
   }
 
+  // Menu management helper methods
+  async getActiveMenuItems(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/menu/active${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getOutOfStockMenu(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/menu/out-of-stock${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getSeasonalSpecials(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/menu/specials${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getMenuPerformance(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/menu/performance${queryString ? `?${queryString}` : ''}`);
+  }
+
   // Order methods
   async getOrders(params = {}) {
     const queryString = new URLSearchParams(params).toString();
@@ -336,15 +357,173 @@ class ApiService {
     return this.request('/staff/stats/overview');
   }
 
+  // Staff & Operations methods
+  async getStaffAttendance(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/staff/attendance${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getStaffTopPerformance(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/staff/performance/top${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getPendingTasks(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/staff/pending-tasks${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getShiftOverview(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/staff/shift-overview${queryString ? `?${queryString}` : ''}`);
+  }
+
+  // Staff-specific helpers
+  async getAssignedOrders(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/staff/assigned-orders${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async updateAssignedOrderStatus(id, status) {
+    return this.request(`/staff/assigned-orders/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async getInventoryTasks(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/staff/inventory-tasks${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getMessages(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/staff/messages${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async postMessage(payload) {
+    return this.request('/staff/messages', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  async getReservationsForStaff(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/staff/reservations${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getTrainingModules(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/staff/training${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async postAvailability(payload) {
+    return this.request('/staff/availability', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
   // Report methods
   async getSalesReport(params = {}) {
     const queryString = new URLSearchParams(params).toString();
     return this.request(`/reports/sales${queryString ? `?${queryString}` : ''}`);
   }
 
+  async getTopPerformers(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/top-performers${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getTrends(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/trends${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getBranchComparisons(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/branch-comparisons${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getCustomerDemographics(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/customer-demographics${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getMarketingImpact(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/marketing-impact${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getProfitabilityByCategory(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/profitability-category${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getRecentActivity(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/recent-activity${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getSupplierAlerts(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/supplier-alerts${queryString ? `?${queryString}` : ''}`);
+  }
+
+  // Owner / Executive API helpers
+  async getOwnerOverview() {
+    return this.get('/reports/owner/overview');
+  }
+
+  async getOwnerBranches() {
+    return this.get('/reports/owner/branches');
+  }
+
+  async getOwnerFinancials() {
+    return this.get('/reports/owner/financials');
+  }
+
+  async getOwnerCustomers() {
+    return this.get('/reports/owner/customers');
+  }
+
+  async getOwnerMenuInsights() {
+    return this.get('/reports/owner/menu-insights');
+  }
+
+  async getOwnerMarketing() {
+    return this.get('/reports/owner/marketing');
+  }
+
+  async getOwnerStaff() {
+    return this.get('/reports/owner/staff');
+  }
+
+  async getOwnerRisk() {
+    return this.get('/reports/owner/risk');
+  }
+
+  async getOwnerForecasts() {
+    return this.get('/reports/owner/forecasts');
+  }
+
+  async getReservationConflicts(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/reservation-conflicts${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getCustomerComplaints(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/customer-complaints${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getDelayedOrders(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/reports/delayed-orders${queryString ? `?${queryString}` : ''}`);
+  }
+
   async getCustomerReport(params = {}) {
     const queryString = new URLSearchParams(params).toString();
     return this.request(`/reports/customers${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getCustomerInsights() {
+    return this.request('/reports/customers/insights');
   }
 
   async getMenuReport(params = {}) {
@@ -355,6 +534,10 @@ class ApiService {
   async getReservationReport(params = {}) {
     const queryString = new URLSearchParams(params).toString();
     return this.request(`/reports/reservations${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getOrdersOverview() {
+    return this.request('/reports/orders-overview');
   }
 
   async getDashboardReport() {
@@ -385,6 +568,28 @@ class ApiService {
     return this.request(`/inventory/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  async getStockLevels() {
+    return this.request('/inventory/stock-levels');
+  }
+
+  async getLowStock() {
+    return this.request('/inventory/low-stock');
+  }
+
+  async getFastSlow(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/inventory/fast-slow${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getWastage(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/inventory/wastage${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getSupplierStatus() {
+    return this.request('/inventory/suppliers/status');
   }
 }
 

@@ -37,7 +37,13 @@ const limiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.'
 });
-app.use('/api/', limiter);
+
+// In development disable the rate limiter to avoid blocking local health checks and frequent dev requests
+if (process.env.NODE_ENV && process.env.NODE_ENV.toLowerCase() === 'development') {
+  console.log('⚠️ Rate limiter disabled in development mode');
+} else {
+  app.use('/api/', limiter);
+}
 
 // CORS configuration - allow configured FRONTEND_URL and localhost with any port during development
 const configuredFrontend = process.env.FRONTEND_URL;

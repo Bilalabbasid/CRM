@@ -6,6 +6,9 @@ import { Layout } from './components/Layout';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import { Dashboard } from './pages/Dashboard';
+import OwnerDashboard from './pages/OwnerDashboard';
+import ManagerDashboard from './pages/ManagerDashboard';
+import StaffDashboard from './pages/StaffDashboard';
 import { Customers } from './pages/Customers';
 import Reservations from './pages/Reservations';
 import Orders from './pages/Orders';
@@ -28,12 +31,15 @@ function App() {
                 <Layout>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
-                    <Route path="/customers" element={<Customers />} />
-                    <Route path="/reservations" element={<Reservations />} />
-                    <Route path="/orders" element={<Orders />} />
-                    <Route path="/menu" element={<MenuPage />} />
-                    <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/staff" element={<Staff />} />
+                    <Route path="/customers" element={<ProtectedRoute requiredRoles={[ 'admin', 'manager' ]}><Customers /></ProtectedRoute>} />
+                    <Route path="/reservations" element={<ProtectedRoute requiredRoles={[ 'staff', 'manager', 'admin' ]}><Reservations /></ProtectedRoute>} />
+                    <Route path="/orders" element={<ProtectedRoute requiredRoles={[ 'staff', 'manager', 'admin' ]}><Orders /></ProtectedRoute>} />
+                    <Route path="/menu" element={<ProtectedRoute requiredRoles={[ 'admin', 'manager' ]}><MenuPage /></ProtectedRoute>} />
+                    <Route path="/analytics" element={<ProtectedRoute requiredRoles={[ 'admin', 'manager' ]}><Analytics /></ProtectedRoute>} />
+                    <Route path="/owner" element={<ProtectedRoute requiredRoles={[ 'admin', 'owner' ]}><OwnerDashboard /></ProtectedRoute>} />
+                    <Route path="/manager" element={<ProtectedRoute requiredRoles={[ 'admin', 'manager' ]}><ManagerDashboard /></ProtectedRoute>} />
+                    <Route path="/staff" element={<ProtectedRoute requiredRoles={[ 'admin', 'manager', 'staff' ]}><Staff /></ProtectedRoute>} />
+                    <Route path="/staff/dashboard" element={<ProtectedRoute requiredRoles={[ 'staff', 'manager', 'admin' ]}><StaffDashboard /></ProtectedRoute>} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>

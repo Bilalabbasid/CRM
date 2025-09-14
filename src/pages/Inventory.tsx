@@ -17,10 +17,24 @@ type InventoryItem = {
   updatedAt?: string;
 };
 
+type FastSlowItem = { name?: string; qtySold?: number; menuItemId?: string; inventoryItemId?: string };
+type FastSlowRes = { periodDays?: number; fast?: FastSlowItem[]; slow?: FastSlowItem[] };
+
+type WastageItem = { name?: string; reason?: string; expiryDate?: string };
+type WastageRes = { expired?: WastageItem[]; unsold?: WastageItem[]; periodDays?: number };
+
+type SupplierOrder = { _id?: string; orderNumber?: string; name?: string; status?: string; state?: string };
+type SupplierStatus = { source?: string; orders?: SupplierOrder[]; items?: SupplierOrder[] };
+
 const Inventory: React.FC = () => {
   const { user } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stockLevels, setStockLevels] = useState<Array<Partial<InventoryItem & { critical?: boolean }>>>([]);
+  const [lowStockItems, setLowStockItems] = useState<Array<Partial<InventoryItem>>>([]);
+  const [fastSlow, setFastSlow] = useState<FastSlowRes>({});
+  const [wastage, setWastage] = useState<WastageRes>({});
+  const [supplierStatus, setSupplierStatus] = useState<SupplierStatus>({});
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: '', quantity: 0, unit: '', notes: '', lowStockThreshold: 5 });
 
@@ -29,6 +43,41 @@ const Inventory: React.FC = () => {
     try {
       const res = await api.getInventory();
       setItems(Array.isArray(res) ? res : []);
+      // load analytics
+      try {
+        if (api && api.getStockLevels) {
+          const sl = await api.getStockLevels();
+          setStockLevels(Array.isArray(sl) ? sl : []);
+        }
+      } catch (e) { console.warn('stockLevels fetch failed', e); }
+
+      try {
+        if (api && api.getLowStock) {
+          const low = await api.getLowStock();
+          setLowStockItems(Array.isArray(low) ? low : []);
+        }
+      } catch (e) { console.warn('lowStock fetch failed', e); }
+
+      try {
+        if (api && api.getFastSlow) {
+          const fs = await api.getFastSlow({ days: 30 });
+          setFastSlow(fs || {});
+        }
+      } catch (e) { console.warn('fastSlow fetch failed', e); }
+
+      try {
+        if (api && api.getWastage) {
+          const w = await api.getWastage({ days: 30 });
+          setWastage(w || {});
+        }
+      } catch (e) { console.warn('wastage fetch failed', e); }
+
+      try {
+        if (api && api.getSupplierStatus) {
+          const s = await api.getSupplierStatus();
+          setSupplierStatus(s || {});
+        }
+      } catch (e) { console.warn('supplierStatus fetch failed', e); }
     } catch (err) {
       console.error('Failed to load inventory', err);
     } finally {
@@ -86,6 +135,126 @@ const Inventory: React.FC = () => {
                 );
               })}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Stock Levels */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+        <Card>
+          <CardHeader>
+            <h3>Stock Levels</h3>
+          </CardHeader>
+          <CardContent>
+            {stockLevels.length === 0 ? <div className="text-sm text-gray-500">No data</div> : (
+              <div className="space-y-2">
+                {stockLevels.map(it => (
+                  <div key={String(it._id)} className={`flex items-center justify-between p-2 border rounded ${it.critical ? 'border-red-300 bg-red-50' : ''}`}>
+                    <div>
+                      <div className="font-medium">{it.name}</div>
+                      <div className="text-sm text-muted-foreground">{it.quantity} {it.unit}</div>
+                    </div>
+                    <div className="text-sm">Threshold: {it.lowStockThreshold}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h3>Low Stock Alerts</h3>
+          </CardHeader>
+          <CardContent>
+            {lowStockItems.length === 0 ? <div className="text-sm text-gray-500">No low stock alerts</div> : (
+              <div className="space-y-2">
+                {lowStockItems.map(it => (
+                  <div key={it._id} className="flex items-center justify-between p-2 border rounded border-red-300 bg-red-50">
+                    <div>
+                      <div className="font-medium">{it.name}</div>
+                      <div className="text-sm text-muted-foreground">{it.quantity} {it.unit}</div>
+                    </div>
+                    <div className="text-sm text-red-600">Threshold: {it.lowStockThreshold}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Fast / Slow movers & Wastage */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <Card>
+          <CardHeader>
+            <h3>Fast Movers (30d)</h3>
+          </CardHeader>
+          <CardContent>
+            {(!fastSlow.fast || fastSlow.fast.length === 0) ? <div className="text-sm text-gray-500">No data</div> : (
+              <div className="space-y-2">
+                {fastSlow.fast.map((f: FastSlowItem | undefined, i: number) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div>{f?.name ?? '—'}</div>
+                    <div className="font-semibold">{f?.qtySold ?? 0}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h3>Slow Movers (30d)</h3>
+          </CardHeader>
+          <CardContent>
+            {(!fastSlow.slow || fastSlow.slow.length === 0) ? <div className="text-sm text-gray-500">No data</div> : (
+              <div className="space-y-2">
+                {fastSlow.slow.map((s: FastSlowItem | undefined, i: number) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div>{s?.name ?? '—'}</div>
+                    <div className="text-sm text-gray-500">{s?.qtySold ?? 0}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <h3>Wastage (Expired / Unsold)</h3>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="text-sm">Expired: {wastage.expired?.length ?? 0}</div>
+              <div className="text-sm">Unsold (30d): {wastage.unsold?.length ?? 0}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Supplier Orders */}
+      <Card className="mt-4">
+        <CardHeader>
+          <h3>Supplier Orders Status</h3>
+        </CardHeader>
+        <CardContent>
+          {supplierStatus.source ? (
+            <div>
+              <div className="text-sm">Source: {supplierStatus.source}</div>
+              <div className="mt-2 space-y-2">
+                {(supplierStatus.orders || supplierStatus.items || []).slice(0,10).map((o: SupplierOrder | undefined, i: number) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="truncate">{o?.orderNumber || o?._id || o?.name || 'order'}</div>
+                    <div className="text-sm text-gray-500">{o?.status || o?.state || 'unknown'}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">No supplier order data</div>
           )}
         </CardContent>
       </Card>

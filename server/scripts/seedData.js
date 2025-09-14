@@ -69,7 +69,12 @@ const seedData = async () => {
       }
     ];
 
-    const createdUsers = await User.insertMany(users);
+    // Hash passwords because insertMany bypasses pre-save middleware
+    const usersWithHashed = await Promise.all(users.map(async u => {
+      const salt = await bcrypt.genSalt(12);
+      return { ...u, password: await bcrypt.hash(u.password, salt) };
+    }));
+    const createdUsers = await User.insertMany(usersWithHashed);
     console.log('👥 Created users');
 
     // Create Customers
@@ -405,7 +410,8 @@ const seedData = async () => {
         total,
         tableNumber: Math.random() > 0.3 ? Math.floor(Math.random() * 20) + 1 : undefined,
         createdAt: orderDate,
-        updatedAt: orderDate
+        updatedAt: orderDate,
+        orderNumber: `ORD-${Date.now().toString().slice(-6)}-${i}`
       });
     }
 

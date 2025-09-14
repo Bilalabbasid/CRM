@@ -18,6 +18,23 @@ declare class ApiService {
   createInventoryItem(itemData: Partial<InventoryItem>): Promise<InventoryItem>;
   updateInventoryItem(id: string, itemData: Partial<InventoryItem>): Promise<InventoryItem>;
   deleteInventoryItem(id: string): Promise<unknown>;
+  getTopPerformers?: (params?: { dateFrom?: string; dateTo?: string; limit?: number }) => Promise<{
+    period: { from: string; to: string };
+    topSelling: Array<any>;
+    leastSelling: Array<any>;
+  }>;
+  getTrends?: (params?: { dateFrom?: string; dateTo?: string }) => Promise<{
+    period: { from: string; to: string };
+    salesByHour: Array<{ _id: number; totalRevenue: number; orders: number }>;
+    lunch: { _id: string; totalRevenue: number; orders: number };
+    dinner: { _id: string; totalRevenue: number; orders: number };
+    promotions: Array<any>;
+  }>;
+  getStockLevels?: () => Promise<Array<Partial<InventoryItem & { critical?: boolean }>>>;
+  getLowStock?: () => Promise<Array<Partial<InventoryItem>>>;
+  getFastSlow?: (params?: { days?: number }) => Promise<{ periodDays: number; fast: Array<any>; slow: Array<any> }>;
+  getWastage?: (params?: { days?: number }) => Promise<{ expired: Array<any>; unsold: Array<any>; periodDays: number }>;
+  getSupplierStatus?: () => Promise<{ source: string; orders?: Array<any>; items?: Array<any> }>;
 }
 
 declare const api: ApiService;
