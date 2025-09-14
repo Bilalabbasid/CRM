@@ -32,6 +32,7 @@ interface Customer {
 }
 
 export const Customers: React.FC = () => {
+  const [showDummyPreview, setShowDummyPreview] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,15 +188,20 @@ export const Customers: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+  <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Customer Management</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage your customer database and relationships</p>
         </div>
+        <div className="flex items-center space-x-2">
         <Button onClick={() => openModal()} className="flex items-center">
           <Plus className="h-4 w-4 mr-2" />
           Add Customer
         </Button>
+        <Button variant="secondary" onClick={() => setShowDummyPreview(true)}>
+          Preview Dummy
+        </Button>
+        </div>
       </div>
 
       <Card>
@@ -349,6 +355,16 @@ export const Customers: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+      <Modal isOpen={showDummyPreview} onClose={() => setShowDummyPreview(false)} title="Dummy Customers Preview">
+        <div className="space-y-3">
+          {customers.map((c) => (
+            <div key={c.id} className="p-3 border rounded">
+              <div className="text-sm font-medium">{c.name}</div>
+              <div className="text-xs text-gray-500">{c.email} • {c.phone}</div>
+            </div>
+          ))}
+        </div>
+      </Modal>
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

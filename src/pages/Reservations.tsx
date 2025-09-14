@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import apiService from '../services/api';
+import { Modal } from '../components/ui/Modal';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import Skeleton from '../components/ui/Skeleton';
@@ -22,6 +23,7 @@ interface Reservation {
 
 const Reservations: React.FC = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [showDummyPreview, setShowDummyPreview] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchReservations = async () => {
@@ -53,7 +55,10 @@ const Reservations: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reservations</h1>
           <p className="text-gray-600 dark:text-gray-400">List of reservations</p>
         </div>
-        <Button onClick={fetchReservations}>Refresh</Button>
+  <div className="flex items-center space-x-2">
+  <Button onClick={fetchReservations}>Refresh</Button>
+  <Button variant="secondary" onClick={() => setShowDummyPreview(true)}>Preview Dummy</Button>
+  </div>
       </div>
 
       <Card>
@@ -107,6 +112,16 @@ const Reservations: React.FC = () => {
           )}
         </CardContent>
       </Card>
+      <Modal isOpen={showDummyPreview} onClose={() => setShowDummyPreview(false)} title="Dummy Reservations Preview">
+        <div className="space-y-3">
+          {reservations.map((r) => (
+            <div key={(r._id || r.id) as string} className="p-3 border rounded">
+              <div className="text-sm font-medium">{(r.customerName as string) || ((r.customer as Record<string, unknown>)?.name as string) || 'Unknown'}</div>
+              <div className="text-xs text-gray-500">Table: {String(r.table || r.tableNumber)} • Party: {String(r.partySize || r.party)}</div>
+            </div>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 };
