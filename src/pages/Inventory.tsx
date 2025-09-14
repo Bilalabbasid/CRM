@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../contexts/ToastContext';
 
 type InventoryItem = {
   _id: string;
@@ -28,6 +29,7 @@ type SupplierStatus = { source?: string; orders?: SupplierOrder[]; items?: Suppl
 
 const Inventory: React.FC = () => {
   const { user } = useAuth();
+  const { success, error, info } = useToast();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [stockLevels, setStockLevels] = useState<Array<Partial<InventoryItem & { critical?: boolean }>>>([]);

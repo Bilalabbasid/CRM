@@ -506,3 +506,10 @@ For support and questions:
 - Staff management and performance tracking
 - Comprehensive reporting and dashboard
 - Docker deployment support
+
+### Recent Updates (UI & Notifications)
+- Integrated a system-wide toast notification system (`src/contexts/ToastContext.tsx`) and added contextual toasts across Analytics, Orders, Menu, and Inventory pages for better user feedback on actions (refresh, export, create, update, delete).
+- Enhanced `Analytics` page with interactive KPI cards, detailed modals for metrics and menu items, and improved export/refresh flows.
+- Fixed sidebar/layout issues and improved responsive behavior for the main layout.
+
+Run the frontend and backend locally and click around the dashboard to see toasts for common actions.

@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../services/api';
 import { Card, CardContent, CardHeader } from '../components/ui/Card';
 import KPICard from '../components/ui/KPICard';
-import { ChartWrapper } from '../components/ui/ChartWrapper';
+import ChartWrapper from '../components/ui/ChartWrapper';
 import { Clock, MessageSquare, Clipboard, ShoppingCart, Box, Calendar, Menu, BookOpen, Users, CheckCircle, AlertTriangle, TrendingUp } from 'lucide-react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 
