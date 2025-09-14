@@ -360,6 +360,32 @@ class ApiService {
   async getDashboardReport() {
     return this.request('/reports/dashboard');
   }
+
+  // Inventory methods
+  async getInventory(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return this.request(`/inventory${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async createInventoryItem(itemData) {
+    return this.request('/inventory', {
+      method: 'POST',
+      body: JSON.stringify(itemData),
+    });
+  }
+
+  async updateInventoryItem(id, itemData) {
+    return this.request(`/inventory/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(itemData),
+    });
+  }
+
+  async deleteInventoryItem(id) {
+    return this.request(`/inventory/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export default new ApiService();
